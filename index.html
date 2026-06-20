@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Golf Sales">
+<title>⛳ Golf Sales Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --green: #1D9E75; --green-light: #EAF3DE; --green-dark: #0F6E56;
+    --purple: #534AB7; --orange: #D85A30; --red: #E24B4A;
+    --bg: #F7F7F5; --card: #FFFFFF; --border: #E8E7E3;
+    --text: #1A1A1A; --text2: #666460; --text3: #9B9893;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Hiragino Sans', sans-serif; min-height: 100vh; padding-bottom: calc(70px + var(--safe-bot)); }
+
+  /* Header */
+  .header { background: var(--green); color: #fff; padding: calc(16px + var(--safe-top)) 16px 16px; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+  .header p { font-size: 12px; opacity: .75; margin-top: 2px; }
+
+  /* Segment */
+  .seg-wrap { padding: 12px 16px 0; }
+  .seg-row { display: flex; background: #E8E7E3; border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg { flex: 1; padding: 7px 0; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; background: none; color: var(--text2); cursor: pointer; transition: all .15s; }
+  .seg.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 16px; }
+  .metric { background: var(--card); border-radius: 14px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .metric.wide { grid-column: 1 / -1; }
+  .metric-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; font-weight: 500; }
+  .metric-value { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -.5px; }
+  .metric-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .metric-value.green { color: var(--green); }
+
+  /* Tab nav */
+  .tab-nav { display: flex; overflow-x: auto; padding: 0 16px; gap: 4px; scrollbar-width: none; border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: calc(68px + var(--safe-top)); z-index: 90; }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab { flex-shrink: 0; padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--text3); border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; }
+  .tab.on { color: var(--green); border-bottom-color: var(--green); }
+
+  /* Views */
+  .view { display: none; padding: 0 16px 16px; }
+  .view.on { display: block; }
+  .section-title { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 8px; }
+
+  /* Chart cards */
+  .chart-card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 12px; }
+  .chart-wrap { position: relative; width: 100%; height: 200px; }
+
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .legend span { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text2); }
+  .lbox { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* Table */
+  .table-card { background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 12px; }
+  .table-card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table-card th { text-align: left; font-size: 11px; font-weight: 600; color: var(--text3); padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .table-card td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  .table-card tr:last-child td { border-bottom: none; }
+  .table-card td.title { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+  .pg { background: #EAF3DE; color: #27500A; }
+  .pa { background: #FAEEDA; color: #633806; }
+  .pr { background: #FCEBEB; color: #791F1F; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 600; }
+  .badge-s { background: #E6F1FB; color: #0C447C; }
+  .badge-n { background: #EEEDFE; color: #3C3489; }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filters select { flex: 1; min-width: 120px; font-size: 13px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+
+  /* Bottom nav */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border); padding: 8px 0 calc(8px + var(--safe-bot)); display: flex; z-index: 100; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--text3); cursor: pointer; border: none; background: none; padding: 4px 0; transition: color .15s; }
+  .nav-item.on { color: var(--green); }
+  .nav-item svg { width: 22px; height: 22px; stroke-width: 1.8; }
+
+  /* Doughnut layout */
+  .donut-wrap { display: flex; align-items: center; gap: 16px; }
+  .donut-wrap canvas { width: 130px !important; height: 130px !important; flex-shrink: 0; }
+  .donut-legend { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .donut-legend .item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .donut-legend .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .donut-legend .name { flex: 1; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .donut-legend .val { color: var(--text); font-weight: 600; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⛳ Golf Sales</h1>
+  <p id="hd-sub">全データ · 読み込み中...</p>
+</div>
+
+<div class="seg-wrap">
+  <div class="seg-row">
+    <button class="seg on" onclick="setDS('all')">合計</button>
+    <button class="seg" onclick="setDS('stock')">有在庫</button>
+    <button class="seg" onclick="setDS('nostock')">無在庫</button>
+  </div>
+</div>
+
+<div class="metrics">
+  <div class="metric wide">
+    <div class="metric-label">累計利益</div>
+    <div class="metric-value green" id="m1">—</div>
+    <div class="metric-sub" id="m1s">—</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">今月利益</div>
+    <div class="metric-value" id="m2">—</div>
+    <div class="metric-sub" id="m2s">—</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">平均利益/件</div>
+    <div class="metric-value" id="m3">—</div>
+    <div class="metric-sub" id="m3s">—</div>
+  </div>
+  <div class="metric wide">
+    <div class="metric-label">単月利益平均（月ごとの合計利益の平均）</div>
+    <div class="metric-value" id="m4">—</div>
+    <div class="metric-sub" id="m4s">—</div>
+  </div>
+</div>
+
+<div class="tab-nav">
+  <button class="tab on" onclick="sw('monthly')">月別推移</button>
+  <button class="tab" onclick="sw('channel')">販売先</button>
+  <button class="tab" onclick="sw('items')">ランキング</button>
+  <button class="tab" onclick="sw('list')">明細</button>
+</div>
+
+<!-- 月別 -->
+<div id="v-monthly" class="view on">
+  <p class="section-title">月別利益と件数</p>
+  <div class="chart-card">
+    <div class="legend">
+      <span><span class="lbox" style="background:var(--green)"></span>利益</span>
+      <span><span class="lbox" style="background:var(--purple);opacity:.6"></span>件数</span>
+    </div>
+    <div class="chart-wrap"><canvas id="c-monthly" role="img" aria-label="月別利益棒グラフ"></canvas></div>
+  </div>
+  <p class="section-title">月別 平均利益/件</p>
+  <div class="chart-card">
+    <div class="chart-wrap"><canvas id="c-avg" role="img" aria-label="月別平均利益折れ線グラフ"></canvas></div>
+  </div>
+</div>
+
+<!-- 販売先 -->
+<div id="v-channel" class="view">
+  <p class="section-title">販売先・販路別利益</p>
+  <div class="chart-card">
+    <div class="donut-wrap">
+      <canvas id="c-donut" role="img" aria-label="販売先別利益ドーナツグラフ" style="max-width:130px;max-height:130px;"></canvas>
+      <div class="donut-legend" id="donut-legend"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ランキング -->
+<div id="v-items" class="view">
+  <p class="section-title">利益ランキング TOP30</p>
+  <div class="table-card">
+    <table>
+      <thead><tr>
+        <th style="width:30px">#</th>
+        <th>商品名</th>
+        <th style="text-align:right">利益</th>
+        <th style="text-align:right">区分</th>
+      </tr></thead>
+      <tbody id="tb-items"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 明細 -->
+<div id="v-list" class="view">
+  <div class="filters">
+    <select id="f-month" onchange="renderList()"><option value="">全期間</option></select>
+    <select id="f-cat" onchange="renderList()">
+      <option value="">全区分</option>
+      <option value="stock">有在庫</option>
+      <option value="nostock">無在庫</option>
+    </select>
+  </div>
+  <div class="table-card">
+    <table>
+      <thead><tr>
+        <th>日付</th>
+        <th>区分</th>
+        <th>商品名</th>
+        <th style="text-align:right">利益</th>
+      </tr></thead>
+      <tbody id="tb-list"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <button class="nav-item on" onclick="sw('monthly')" id="nav-monthly">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>月別
+  </button>
+  <button class="nav-item" onclick="sw('channel')" id="nav-channel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l4 4"/></svg>販売先
+  </button>
+  <button class="nav-item" onclick="sw('items')" id="nav-items">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M3 12h12M3 18h8"/></svg>ランク
+  </button>
+  <button class="nav-item" onclick="sw('list')" id="nav-list">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>明細
+  </button>
+</nav>
+
+<script>
+const STOCK=[{"country":"US","profit":-1600,"date":"2026/05/17","month":"2026/05","cost":13000,"title":"Callaway EPIC SPEED 3W RH, Ventus red velocore shaft","cat":"stock"},{"country":"US","profit":8183,"date":"2025/12/04","month":"2025/12","cost":15300,"title":"Taylormade SIM2 MAX D 7W Regular with HC 6/10","cat":"stock"},{"country":"US","profit":298,"date":"2026/01/02","month":"2026/01","cost":17450,"title":"PING G425 MAX Driver Head","cat":"stock"},{"country":"US","profit":9303,"date":"2025/12/15","month":"2025/12","cost":21400,"title":"NEW Stealth2 HD 7W Fairway","cat":"stock"},{"country":"US","profit":8372,"date":"2025/12/27","month":"2025/12","cost":14920,"title":"SIM2 MAX D 7W head","cat":"stock"},{"country":"US","profit":9000,"date":"2025/12/19","month":"2025/12","cost":18480,"title":"Stealth 2 HD 7W Fairway","cat":"stock"},{"country":"DOM","profit":1366,"date":"2026/02/09","month":"2026/02","cost":14060,"title":"Ventus TR Red Velocore 6X 3W shaft","cat":"stock"},{"country":"DOM","profit":2361,"date":"2026/02/07","month":"2026/02","cost":10500,"title":"Ventus black velocore 5X","cat":"stock"},{"country":"DOM","profit":3905,"date":"2026/01/31","month":"2026/01","cost":4895,"title":"Tour AD IZ Fairway shaft Titleist adaptor","cat":"stock"},{"country":"DOM","profit":3400,"date":"2026/03/26","month":"2026/03","cost":12000,"title":"Titleist TSR3 driver head 8°","cat":"stock"},{"country":"US","profit":8395,"date":"2026/02/02","month":"2026/02","cost":25000,"title":"Callaway Elyte driver head NEW","cat":"stock"},{"country":"US","profit":9039,"date":"2026/02/06","month":"2026/02","cost":13500,"title":"NEW Diamana BB driver shaft callaway","cat":"stock"},{"country":"DOM","profit":3251,"date":"2026/02/12","month":"2026/02","cost":2000,"title":"Speeder evo 661 driver shaft Taylormade","cat":"stock"},{"country":"DOM","profit":3230,"date":"2026/02/22","month":"2026/02","cost":4000,"title":"Titleist TS4 driver head","cat":"stock"},{"country":"US","profit":4287,"date":"2026/03/02","month":"2026/03","cost":10000,"title":"Tour AD IZ driver shaft Titleist","cat":"stock"},{"country":"US","profit":7944,"date":"2026/01/29","month":"2026/01","cost":11500,"title":"Diamana WB 63X driver shaft PING","cat":"stock"},{"country":"US","profit":7325,"date":"2026/02/09","month":"2026/02","cost":11903,"title":"Tour AD FI fairway wood shaft","cat":"stock"},{"country":"CA","profit":5960,"date":"2026/02/13","month":"2026/02","cost":8280,"title":"Tour AD IZ driver shaft PING 43.75","cat":"stock"},{"country":"DOM","profit":1102,"date":"2026/02/09","month":"2026/02","cost":20000,"title":"NEW Qi10 tour 5W head only","cat":"stock"},{"country":"CA","profit":5895,"date":"2026/02/12","month":"2026/02","cost":6540,"title":"Tour AD IZ driver shaft no adaptor","cat":"stock"},{"country":"DE","profit":11030,"date":"2026/02/05","month":"2026/02","cost":6470,"title":"New tour ad vf taylormade fairway 5w","cat":"stock"},{"country":"US","profit":5669,"date":"2026/03/09","month":"2026/03","cost":7555,"title":"Titleist TSi2 5Wood head only","cat":"stock"},{"country":"FI","profit":6529,"date":"2026/02/14","month":"2026/02","cost":9000,"title":"Tour AD DI-5S 5W shaft Titleist adaptor","cat":"stock"},{"country":"US","profit":6224,"date":"2026/03/09","month":"2026/03","cost":11400,"title":"Tour AD DI 6s driver shaft Taylormade","cat":"stock"},{"country":"DE","profit":6673,"date":"2026/02/17","month":"2026/02","cost":14400,"title":"Tour AD VF driver shaft PING 43.75","cat":"stock"},{"country":"DOM","profit":4078,"date":"2026/02/21","month":"2026/02","cost":23200,"title":"Callaway Elyte driver head used","cat":"stock"},{"country":"DOM","profit":2800,"date":"2026/02/16","month":"2026/02","cost":2000,"title":"ventus green driver shaft Callaway","cat":"stock"},{"country":"DOM","profit":2955,"date":"2026/04/03","month":"2026/04","cost":15500,"title":"Diamana WB 53X driver shaft ping adaptor","cat":"stock"},{"country":"DOM","profit":3350,"date":"2026/03/01","month":"2026/03","cost":22500,"title":"Callaway elyte x driver head only","cat":"stock"},{"country":"CA","profit":5344,"date":"2026/03/11","month":"2026/03","cost":16000,"title":"Diamana BB 53S driver shaft","cat":"stock"},{"country":"GE","profit":9612,"date":"2026/03/01","month":"2026/03","cost":25810,"title":"Taylormade BRNR mini driver head","cat":"stock"},{"country":"DOM","profit":1305,"date":"2026/04/17","month":"2026/04","cost":5000,"title":"Tour AD TP mini driver shaft Taylormade","cat":"stock"},{"country":"DOM","profit":2825,"date":"2026/03/14","month":"2026/03","cost":14000,"title":"PING G430 HL MAX 3W head","cat":"stock"},{"country":"DOM","profit":4827,"date":"2026/02/21","month":"2026/02","cost":3380,"title":"Speeder NX HL 45 fairway shaft","cat":"stock"},{"country":"US","profit":3624,"date":"2026/03/01","month":"2026/03","cost":14500,"title":"Taylormade SIM2 driver head","cat":"stock"},{"country":"DOM","profit":4795,"date":"2026/03/15","month":"2026/03","cost":18205,"title":"PING G430 HL SFT 5W head only","cat":"stock"},{"country":"US","profit":6641,"date":"2026/04/25","month":"2026/04","cost":26620,"title":"Taylormade SIM MAX ironset 6pcs","cat":"stock"},{"country":"DOM","profit":3220,"date":"2026/03/11","month":"2026/03","cost":10280,"title":"Callaway paradym X driver head","cat":"stock"},{"country":"US","profit":5225,"date":"2026/04/03","month":"2026/04","cost":10000,"title":"TENSEI pro white 1k driver shaft callaway","cat":"stock"},{"country":"US","profit":5827,"date":"2026/03/11","month":"2026/03","cost":6500,"title":"Taylormade M2 driver head only","cat":"stock"},{"country":"US","profit":7153,"date":"2026/04/02","month":"2026/04","cost":6500,"title":"Tour AD XC driver shaft Taylormade","cat":"stock"},{"country":"DOM","profit":2785,"date":"2026/03/16","month":"2026/03","cost":11000,"title":"Taylormade stealth 2 driver head only","cat":"stock"},{"country":"CA","profit":10527,"date":"2026/04/04","month":"2026/04","cost":23595,"title":"Tour AD CQ + Tour AD DI dri ping","cat":"stock"},{"country":"US","profit":6809,"date":"2026/04/17","month":"2026/04","cost":14000,"title":"Tour AD VF 5X driver shaft titleist","cat":"stock"},{"country":"US","profit":6148,"date":"2026/03/24","month":"2026/03","cost":7000,"title":"Tour AD XC driver shaft Taylormade cadero grip","cat":"stock"},{"country":"US","profit":9030,"date":"2026/03/28","month":"2026/03","cost":7260,"title":"Taylormade SIM driver head","cat":"stock"},{"country":"US","profit":7703,"date":"2026/04/04","month":"2026/04","cost":16220,"title":"ventus black driver shaft velocore titleist","cat":"stock"},{"country":"US","profit":6693,"date":"2026/05/13","month":"2026/05","cost":25000,"title":"Scotty Cameron Tel3 Santafe","cat":"stock"},{"country":"CA","profit":6041,"date":"2026/04/11","month":"2026/04","cost":14660,"title":"Diamana BB 63X driver shaft callaway adaptor","cat":"stock"},{"country":"HK","profit":7578,"date":"2026/03/16","month":"2026/03","cost":15760,"title":"Diamana BB 53X driver shaft Titleist 43.75","cat":"stock"},{"country":"US","profit":6630,"date":"2026/03/19","month":"2026/03","cost":9160,"title":"Tour AD IZ S 3W shaft titleist","cat":"stock"},{"country":"US","profit":5953,"date":"2026/05/06","month":"2026/05","cost":12800,"title":"Taylormade M2 driver head only","cat":"stock"},{"country":"US","profit":7455,"date":"2026/03/17","month":"2026/03","cost":10080,"title":"Taylormade Spider X Sx putter","cat":"stock"},{"country":"CA","profit":8741,"date":"2026/04/01","month":"2026/04","cost":13400,"title":"Tour AD VF 6S driver shaft titleist","cat":"stock"},{"country":"US","profit":8971,"date":"2026/03/15","month":"2026/03","cost":18000,"title":"Taylormade SIM2 MAX 7W Stiff shaft","cat":"stock"},{"country":"AU","profit":4587,"date":"2026/03/19","month":"2026/03","cost":10500,"title":"PING G400 driver head 10.5°","cat":"stock"},{"country":"US","profit":4514,"date":"2026/06/09","month":"2026/06","cost":10000,"title":"Tour AD IZ-6S driver shaft ping adaptor","cat":"stock"},{"country":"US","profit":7027,"date":"2026/03/23","month":"2026/03","cost":21500,"title":"Mizuno MP-5 head only 6pcs","cat":"stock"},{"country":"US","profit":5620,"date":"2026/03/28","month":"2026/03","cost":7500,"title":"Taylormade M2(2017) driver head","cat":"stock"},{"country":"US","profit":5465,"date":"2026/04/04","month":"2026/04","cost":14795,"title":"Taylormade Spider tour black putter","cat":"stock"},{"country":"CA","profit":9284,"date":"2026/03/25","month":"2026/03","cost":17626,"title":"Taylormade SIM2 MAX D 7W regular shaft","cat":"stock"},{"country":"US","profit":8334,"date":"2026/03/28","month":"2026/03","cost":25500,"title":"Taylormade BRNR MINI 11.5 driver head","cat":"stock"},{"country":"DOM","profit":3450,"date":"2026/06/01","month":"2026/06","cost":2000,"title":"Diamana F","cat":"stock"},{"country":"US","profit":6171,"date":"2026/06/16","month":"2026/06","cost":12500,"title":"Tour AD UB 6X driver shaft titleist adaptor","cat":"stock"},{"country":"US","profit":8072,"date":"2026/04/03","month":"2026/04","cost":18816,"title":"Taylormade SIM2 7W X shaft","cat":"stock"},{"country":"US","profit":13345,"date":"2026/04/11","month":"2026/04","cost":15793,"title":"Taylormade SIM2 7W S shaft","cat":"stock"},{"country":"US","profit":4526,"date":"2026/04/04","month":"2026/04","cost":8780,"title":"Taylormade M2(2017) head","cat":"stock"},{"country":"US","profit":4776,"date":"2026/05/14","month":"2026/05","cost":0,"title":"attas punch dri shaft Taylormade","cat":"stock"},{"country":"US","profit":4111,"date":"2026/06/10","month":"2026/06","cost":9000,"title":"Taylormade SIM 9° ヘッド","cat":"stock"},{"country":"US","profit":4111,"date":"2026/05/18","month":"2026/05","cost":8500,"title":"Tour AD XC dri shaft Taylormade","cat":"stock"},{"country":"US","profit":5132,"date":"2026/04/11","month":"2026/04","cost":8200,"title":"Taylormade Stealth driver head","cat":"stock"},{"country":"US","profit":4832,"date":"2026/04/11","month":"2026/04","cost":8500,"title":"Titleist TSi2 3W head","cat":"stock"},{"country":"US","profit":6292,"date":"2026/06/06","month":"2026/06","cost":10000,"title":"Tour AD DI 3W shaft Titleist","cat":"stock"},{"country":"US","profit":7356,"date":"2026/06/01","month":"2026/06","cost":3000,"title":"SRIXON ZX5 dri head","cat":"stock"},{"country":"US","profit":8155,"date":"2026/05/29","month":"2026/05","cost":12305,"title":"Tour AD DI dri shaft No adaptor 43.75","cat":"stock"},{"country":"US","profit":5864,"date":"2026/04/09","month":"2026/04","cost":9610,"title":"Tour AD IZ Fairway Wood shaft Titleist","cat":"stock"},{"country":"US","profit":8902,"date":"2026/04/14","month":"2026/04","cost":10327,"title":"Taylormade M2 7W stiff","cat":"stock"},{"country":"US","profit":7886,"date":"2026/04/20","month":"2026/04","cost":3630,"title":"Mizuno GX 7W regular shaft","cat":"stock"},{"country":"US","profit":9431,"date":"2026/04/12","month":"2026/04","cost":15610,"title":"Taylormade spider tour putter","cat":"stock"},{"country":"US","profit":9507,"date":"2026/04/19","month":"2026/04","cost":18810,"title":"Taylormade stealth 2 HD 7W stiff shaft","cat":"stock"},{"country":"US","profit":7645,"date":"2026/05/17","month":"2026/05","cost":19824,"title":"SIM2 MAX D 7W Stiff","cat":"stock"},{"country":"US","profit":8851,"date":"2026/06/07","month":"2026/06","cost":8420,"title":"Spider tour black double bend","cat":"stock"},{"country":"US","profit":10509,"date":"2026/04/25","month":"2026/04","cost":13000,"title":"G400 Driver","cat":"stock"},{"country":"US","profit":5285,"date":"2026/05/12","month":"2026/05","cost":10000,"title":"Diamana GT 60X driver shaft ping","cat":"stock"},{"country":"US","profit":5132,"date":"2026/04/23","month":"2026/04","cost":8200,"title":"Taylormade stealth driver head with HC","cat":"stock"},{"country":"US","profit":5971,"date":"2026/05/06","month":"2026/05","cost":12700,"title":"Ventus blue velocore 3W shaft PING","cat":"stock"},{"country":"US","profit":9578,"date":"2026/05/25","month":"2026/05","cost":21196,"title":"PING G430 SFT 7W head","cat":"stock"},{"country":"DOM","profit":5625,"date":"2026/05/21","month":"2026/05","cost":2000,"title":"Alta J CB 7W shaft","cat":"stock"},{"country":"US","profit":11316,"date":"2026/05/15","month":"2026/05","cost":37024,"title":"Qi10 tour 3 wood + Diamana BB-73X","cat":"stock"},{"country":"US","profit":5023,"date":"2026/05/19","month":"2026/05","cost":8620,"title":"Tour AD VF 41.3 shaft Taylormade","cat":"stock"},{"country":"Ireland","profit":7262,"date":"2026/04/30","month":"2026/04","cost":16500,"title":"Taylormade stealth 7wood stiff shaft","cat":"stock"},{"country":"US","profit":8905,"date":"2026/04/30","month":"2026/04","cost":19080,"title":"Taylormade stealth 2 HD 7W regular shaft","cat":"stock"},{"country":"GB","profit":11091,"date":"2026/05/21","month":"2026/05","cost":15460,"title":"TM SIM2 MAX DR SR","cat":"stock"},{"country":"US","profit":13197,"date":"2026/05/06","month":"2026/05","cost":12210,"title":"Spider tour black double bend 34","cat":"stock"},{"country":"US","profit":9795,"date":"2026/05/06","month":"2026/05","cost":11310,"title":"STealth 2 7W head","cat":"stock"},{"country":"US","profit":7479,"date":"2026/05/27","month":"2026/05","cost":10000,"title":"Tour AD DI driver shaft TM","cat":"stock"},{"country":"US","profit":6613,"date":"2026/05/30","month":"2026/05","cost":8190,"title":"GX 7W regular","cat":"stock"},{"country":"GB","profit":7143,"date":"2026/05/16","month":"2026/05","cost":6380,"title":"RBZ 7wood regular","cat":"stock"},{"country":"US","profit":9455,"date":"2026/05/06","month":"2026/05","cost":16080,"title":"TM SIM2 MAX 7 wood regular","cat":"stock"},{"country":"US","profit":11907,"date":"2026/05/15","month":"2026/05","cost":16078,"title":"Stealth 2 HD 7 wood","cat":"stock"},{"country":"AU","profit":6978,"date":"2026/05/10","month":"2026/05","cost":10306,"title":"M2 2016 driver","cat":"stock"},{"country":"GB","profit":9236,"date":"2026/05/28","month":"2026/05","cost":17960,"title":"G425 driver 9","cat":"stock"},{"country":"US","profit":6880,"date":"2026/05/12","month":"2026/05","cost":12080,"title":"spider X blue","cat":"stock"},{"country":"GB","profit":11075,"date":"2026/05/23","month":"2026/05","cost":27580,"title":"BRNR mini driver 13.5","cat":"stock"},{"country":"GB","profit":8404,"date":"2026/05/20","month":"2026/05","cost":17100,"title":"SIM2 MAX 7 wood Regular","cat":"stock"},{"country":"US","profit":8223,"date":"2026/06/05","month":"2026/06","cost":14960,"title":"spider tour black putter","cat":"stock"},{"country":"US","profit":12773,"date":"2026/06/16","month":"2026/06","cost":18580,"title":"SIM2 MAX D driver","cat":"stock"},{"country":"US","profit":13225,"date":"2026/05/22","month":"2026/05","cost":8587,"title":"M2 driver regular 2016","cat":"stock"},{"country":"GB","profit":6861,"date":"2026/05/30","month":"2026/05","cost":8587,"title":"Taylormade Stage 2 7W","cat":"stock"},{"country":"AU","profit":6035,"date":"2026/05/23","month":"2026/05","cost":8205,"title":"Tour AD XC 7X 1W Taylormade","cat":"stock"},{"country":"US","profit":7582,"date":"2026/06/08","month":"2026/06","cost":8205,"title":"Tour AD XC 7X 1W PING","cat":"stock"},{"country":"US","profit":12118,"date":"2026/06/01","month":"2026/06","cost":10210,"title":"Taylormade M2 D 1W","cat":"stock"},{"country":"US","profit":13365,"date":"2026/05/23","month":"2026/05","cost":10752,"title":"Taylormade M2 7W stiff","cat":"stock"},{"country":"US","profit":7815,"date":"2026/05/18","month":"2026/05","cost":10000,"title":"Taylormade M2 driver 2017","cat":"stock"},{"country":"US","profit":11852,"date":"2026/06/07","month":"2026/06","cost":24080,"title":"P G430 SFT 7W","cat":"stock"},{"country":"US","profit":11037,"date":"2026/06/01","month":"2026/06","cost":13080,"title":"TM Spider Tour DOUBLE BEND","cat":"stock"},{"country":"US","profit":10262,"date":"2026/06/11","month":"2026/06","cost":12566,"title":"TM M2 7W","cat":"stock"},{"country":"US","profit":10381,"date":"2026/06/01","month":"2026/06","cost":11947,"title":"TM M2 1W","cat":"stock"},{"country":"US","profit":12537,"date":"2026/06/13","month":"2026/06","cost":11080,"title":"TM M2 1W","cat":"stock"},{"country":"US","profit":6382,"date":"2026/06/06","month":"2026/06","cost":11000,"title":"Tour AD VF FW Tit","cat":"stock"},{"country":"US","profit":7539,"date":"2026/06/13","month":"2026/06","cost":15000,"title":"Tour AD VF 1W Tit","cat":"stock"},{"country":"US","profit":12717,"date":"2026/06/10","month":"2026/06","cost":11400,"title":"TM SIM2 MAX-D 7W","cat":"stock"},{"country":"US","profit":9400,"date":"2026/06/16","month":"2026/06","cost":10349,"title":"TM M2 2016 1W","cat":"stock"}];
+const NOSTOCK=[{"date":"2026/03/06","month":"2026/03","profit":836,"platform":"Yahoo!フリマ","title":"NEW Qi10 MAX driver head","cost":24539,"cat":"nostock"},{"date":"2026/03/06","month":"2026/03","profit":1055,"platform":"Yahoo!フリマ","title":"Qi10 cover","cost":0,"cat":"nostock"},{"date":"2026/03/18","month":"2026/03","profit":6485,"platform":"Yahoo!フリマ","title":"NEW diamana TM","cost":0,"cat":"nostock"},{"date":"2026/03/08","month":"2026/03","profit":-1008,"platform":"Yahoo!フリマ","title":"NEW Qi35 driver head","cost":29233,"cat":"nostock"},{"date":"2026/03/08","month":"2026/03","profit":1435,"platform":"Yahoo!フリマ","title":"NEW Qi35 HC","cost":0,"cat":"nostock"},{"date":"2026/03/18","month":"2026/03","profit":6485,"platform":"Yahoo!フリマ","title":"NEW diamana TM","cost":0,"cat":"nostock"},{"date":"2026/03/18","month":"2026/03","profit":6096,"platform":"ebay","title":"NEW Qi10 MAX driver head 10.5","cost":27498,"cat":"nostock"},{"date":"2026/03/18","month":"2026/03","profit":1200,"platform":"Yahoo!フリマ","title":"NEW Qi10 HC","cost":0,"cat":"nostock"},{"date":"2026/03/28","month":"2026/03","profit":5820,"platform":"Yahoo!フリマ","title":"NEW Diamana TM driver shaft (Qi10)","cost":0,"cat":"nostock"},{"date":"2026/03/12","month":"2026/03","profit":3323,"platform":"Yahoo!フリマ","title":"NEW GT driver head 10°","cost":49127,"cat":"nostock"},{"date":"2026/03/12","month":"2026/03","profit":2100,"platform":"Yahoo!フリマ","title":"NEW GT HC","cost":0,"cat":"nostock"},{"date":"2026/03/15","month":"2026/03","profit":9996,"platform":"ebay","title":"NEW TENSEI 1k driver shaft GT2","cost":0,"cat":"nostock"},{"date":"2026/03/10","month":"2026/03","profit":5910,"platform":"ebay","title":"NEW Cobra DS ADAPT MAX-K driver","cost":32496,"cat":"nostock"},{"date":"2026/03/17","month":"2026/03","profit":7231,"platform":"ebay","title":"NEW Qi35 driver head only RH","cost":28872,"cat":"nostock"},{"date":"2026/03/17","month":"2026/03","profit":1435,"platform":"Yahoo!フリマ","title":"NEW Qi35 cover","cost":0,"cat":"nostock"},{"date":"2026/03/16","month":"2026/03","profit":6796,"platform":"ebay","title":"Odyssey Giraffe Beam 7 Putter","cost":18080,"cat":"nostock"},{"date":"2026/03/17","month":"2026/03","profit":5558,"platform":"ebay","title":"NEW ODYSSEY Giraffe beam 6 putter","cost":21234,"cat":"nostock"},{"date":"2026/03/24","month":"2026/03","profit":7454,"platform":"ebay","title":"NEW Qi10 MAX head","cost":26800,"cat":"nostock"},{"date":"2026/03/21","month":"2026/03","profit":-90,"platform":"Yahoo!フリマ","title":"NEW QI35 MAX","cost":28790,"cat":"nostock"},{"date":"2026/03/21","month":"2026/03","profit":8676,"platform":"ebay","title":"NEW ODYSSEY Ai-One square JAILBIRD 34","cost":19502,"cat":"nostock"},{"date":"2026/03/23","month":"2026/03","profit":5322,"platform":"ebay","title":"NEW ODYSSEY Giraffe beam 6 CH 34","cost":21856,"cat":"nostock"},{"date":"2026/03/25","month":"2026/03","profit":5108,"platform":"ebay","title":"NEW Qi35 MAX driver head 10.5","cost":30995,"cat":"nostock"},{"date":"2026/03/28","month":"2026/03","profit":1435,"platform":"Yahoo!フリマ","title":"HC","cost":0,"cat":"nostock"},{"date":"2026/03/29","month":"2026/03","profit":6430,"platform":"ebay","title":"NEW odyssey ai one square 2 jailbird 34","cost":21167,"cat":"nostock"},{"date":"2026/03/29","month":"2026/03","profit":9706,"platform":"ebay","title":"NEW cobra ds adapt ls driver head","cost":22085,"cat":"nostock"},{"date":"2026/03/29","month":"2026/03","profit":4245,"platform":"ebay","title":"NEW Qi35 driver head","cost":31378,"cat":"nostock"},{"date":"2026/04/03","month":"2026/04","profit":8887,"platform":"ebay","title":"giraffe beam 7","cost":21321,"cat":"nostock"},{"date":"2026/04/03","month":"2026/04","profit":5759,"platform":"ebay","title":"giraffe beam 1 ch","cost":20533,"cat":"nostock"},{"date":"2026/04/03","month":"2026/04","profit":6698,"platform":"ebay","title":"Qi10 NEW MAX head","cost":26214,"cat":"nostock"},{"date":"2026/04/06","month":"2026/04","profit":6295,"platform":"Yahoo!フリマ","title":"Diamana regular shaft","cost":0,"cat":"nostock"},{"date":"2026/04/07","month":"2026/04","profit":6390,"platform":"Yahoo!フリマ","title":"Diamana regular shaft","cost":0,"cat":"nostock"},{"date":"2026/04/08","month":"2026/04","profit":1435,"platform":"Yahoo!フリマ","title":"HC","cost":0,"cat":"nostock"},{"date":"2026/04/08","month":"2026/04","profit":1055,"platform":"Yahoo!フリマ","title":"HC","cost":0,"cat":"nostock"},{"date":"2026/04/03","month":"2026/04","profit":8327,"platform":"ebay","title":"giraffe beam 7","cost":21881,"cat":"nostock"},{"date":"2026/04/08","month":"2026/04","profit":3974,"platform":"ebay","title":"DS ADAPT MAX-K DRIVER HEAD 10.5","cost":29039,"cat":"nostock"},{"date":"2026/04/10","month":"2026/04","profit":5159,"platform":"ebay","title":"NEW Taylormade Qi10 driver head 10.5","cost":28779,"cat":"nostock"},{"date":"2026/04/10","month":"2026/04","profit":3237,"platform":"ebay","title":"NEW Taylormade Qi10 driver head 9","cost":29724,"cat":"nostock"},{"date":"2026/04/13","month":"2026/04","profit":4677,"platform":"ebay","title":"NEW odyssey Giraffe 1 33","cost":22268,"cat":"nostock"},{"date":"2026/04/13","month":"2026/04","profit":5429,"platform":"ebay","title":"NEW odyssey Giraffe 7 34","cost":24779,"cat":"nostock"},{"date":"2026/04/13","month":"2026/04","profit":4756,"platform":"ebay","title":"NEW Qi10 MAX 9 degree","cost":28387,"cat":"nostock"},{"date":"2026/04/13","month":"2026/04","profit":3770,"platform":"ebay","title":"NEW Qi10 9 degree","cost":30156,"cat":"nostock"},{"date":"2026/04/14","month":"2026/04","profit":8460,"platform":"ebay","title":"NEW Qi10 9 degree","cost":25466,"cat":"nostock"},{"date":"2026/04/14","month":"2026/04","profit":6679,"platform":"ebay","title":"NEW DS adapt max k 10.5 head","cost":26334,"cat":"nostock"},{"date":"2026/04/14","month":"2026/04","profit":6512,"platform":"ebay","title":"NEW Qi10 9 degree","cost":27936,"cat":"nostock"},{"date":"2026/04/15","month":"2026/04","profit":6159,"platform":"ebay","title":"NEW Qi10 9°","cost":28289,"cat":"nostock"},{"date":"2026/04/15","month":"2026/04","profit":5429,"platform":"ebay","title":"NEW Qi10 MAX 9°","cost":27714,"cat":"nostock"},{"date":"2026/04/15","month":"2026/04","profit":9987,"platform":"ebay","title":"NEW odyssey Giraffe beam cruiser 38","cost":22309,"cat":"nostock"},{"date":"2026/04/15","month":"2026/04","profit":5231,"platform":"Yahoo!フリマ","title":"Stiff","cost":0,"cat":"nostock"},{"date":"2026/04/16","month":"2026/04","profit":4914,"platform":"ebay","title":"NEW odyssey giraffe beam 7 33 inch","cost":25294,"cat":"nostock"},{"date":"2026/04/16","month":"2026/04","profit":5155,"platform":"Yahoo!フリマ","title":"stiff","cost":0,"cat":"nostock"},{"date":"2026/04/17","month":"2026/04","profit":7375,"platform":"ebay","title":"NEW odyssey Giraffe beam 7 putter 34","cost":22475,"cat":"nostock"},{"date":"2026/04/17","month":"2026/04","profit":19938,"platform":"ebay","title":"NEW Taylormade Qi iron set women 5Pcs","cost":53400,"cat":"nostock"},{"date":"2026/04/18","month":"2026/04","profit":5765,"platform":"ebay","title":"NEW odyssey giraffe beam 7 putter 34","cost":24146,"cat":"nostock"},{"date":"2026/04/18","month":"2026/04","profit":5725,"platform":"Yahoo!フリマ","title":"Regular","cost":0,"cat":"nostock"},{"date":"2026/04/18","month":"2026/04","profit":1245,"platform":"Yahoo!フリマ","title":"HC","cost":0,"cat":"nostock"},{"date":"2026/04/19","month":"2026/04","profit":5021,"platform":"ebay","title":"NEW odyssey giraffe beam 7 34","cost":25187,"cat":"nostock"},{"date":"2026/04/19","month":"2026/04","profit":2519,"platform":"ebay","title":"new qi 35 max driver head 9°","cost":32113,"cat":"nostock"},{"date":"2026/04/19","month":"2026/04","profit":13170,"platform":"ebay","title":"NEW ODYSSEY giraffe beam #7 3 putters RH","cost":72352,"cat":"nostock"},{"date":"2026/04/19","month":"2026/04","profit":7055,"platform":"Yahoo!フリマ","title":"mamiya linq dri shaft cobra","cost":0,"cat":"nostock"},{"date":"2026/04/21","month":"2026/04","profit":5927,"platform":"ebay","title":"NEW ODYSSEY giraffe beam #7 34 inch RH","cost":23381,"cat":"nostock"},{"date":"2026/04/21","month":"2026/04","profit":-7568,"platform":"ebay","title":"NEW PING G430 MAX 10k driver head","cost":52327,"cat":"nostock"},{"date":"2026/04/21","month":"2026/04","profit":5409,"platform":"ebay","title":"NEW Qi10 MAX 10.5 driver head","cost":28387,"cat":"nostock"},{"date":"2026/04/22","month":"2026/04","profit":-3032,"platform":"ebay","title":"NEW PING G430 MAX 10k driver head","cost":48138,"cat":"nostock"},{"date":"2026/04/23","month":"2026/04","profit":12198,"platform":"ebay","title":"women new TM qi iron","cost":61383,"cat":"nostock"},{"date":"2026/04/24","month":"2026/04","profit":2100,"platform":"ebay","title":"NEW qi 35 MAX driver head","cost":33523,"cat":"nostock"},{"date":"2026/04/27","month":"2026/04","profit":8438,"platform":"ebay","title":"NEW cobra ds adapt max-k head","cost":24575,"cat":"nostock"},{"date":"2026/04/28","month":"2026/04","profit":7028,"platform":"ebay","title":"NEW odyssey giraffe 7 34","cost":22680,"cat":"nostock"},{"date":"2026/04/29","month":"2026/04","profit":5199,"platform":"ebay","title":"NEW Qi10 Driver Head","cost":28425,"cat":"nostock"},{"date":"2026/04/30","month":"2026/04","profit":5876,"platform":"ebay","title":"NEW Tour AD FI","cost":22443,"cat":"nostock"},{"date":"2026/05/01","month":"2026/05","profit":4667,"platform":"ebay","title":"NEW Qi35 MAX Driver Head","cost":28374,"cat":"nostock"},{"date":"2026/05/04","month":"2026/05","profit":5467,"platform":"ebay","title":"NEW OD Ai-one square 2 MAX","cost":22630,"cat":"nostock"},{"date":"2026/05/05","month":"2026/05","profit":7464,"platform":"ebay","title":"NEW Qi35 MAX Driver","cost":31227,"cat":"nostock"},{"date":"2026/05/07","month":"2026/05","profit":7715,"platform":"ebay","title":"NEW Stealth Iron Set","cost":40975,"cat":"nostock"},{"date":"2026/05/07","month":"2026/05","profit":4591,"platform":"ebay","title":"NEW Qi10 MAX Driver Head","cost":28057,"cat":"nostock"},{"date":"2026/05/10","month":"2026/05","profit":6239,"platform":"ebay","title":"NEW OD Giraffe 7","cost":22164,"cat":"nostock"},{"date":"2026/05/11","month":"2026/05","profit":-737,"platform":"ebay","title":"NEW G430 MAX 10k Driver Head","cost":46301,"cat":"nostock"},{"date":"2026/05/11","month":"2026/05","profit":3827,"platform":"ebay","title":"NEW OD Giraffe 7","cost":24576,"cat":"nostock"},{"date":"2026/05/12","month":"2026/05","profit":9699,"platform":"ebay","title":"NEW OD Giraffe 7","cost":18704,"cat":"nostock"},{"date":"2026/05/13","month":"2026/05","profit":2212,"platform":"ebay","title":"NEW Mutsumi Honma 13W","cost":11834,"cat":"nostock"},{"date":"2026/05/14","month":"2026/05","profit":9449,"platform":"ebay","title":"NEW OD Giraffe 7","cost":19606,"cat":"nostock"},{"date":"2026/05/17","month":"2026/05","profit":11471,"platform":"ebay","title":"PING tour 2.0 black driver shaft","cost":0,"cat":"nostock"},{"date":"2026/05/17","month":"2026/05","profit":8240,"platform":"ebay","title":"NEW OD Ai-one square 2 MAX","cost":21468,"cat":"nostock"},{"date":"2026/05/18","month":"2026/05","profit":5085,"platform":"ebay","title":"NEW OD Giraffe 7","cost":23970,"cat":"nostock"},{"date":"2026/05/19","month":"2026/05","profit":10312,"platform":"ebay","title":"NEW Tit GT1 3TOUR","cost":34178,"cat":"nostock"},{"date":"2026/05/20","month":"2026/05","profit":6936,"platform":"ebay","title":"NEW OD Giraffe 7","cost":22119,"cat":"nostock"},{"date":"2026/05/20","month":"2026/05","profit":11701,"platform":"ebay","title":"NEW OD Giraffe JAILBIRD 38","cost":19972,"cat":"nostock"},{"date":"2026/05/21","month":"2026/05","profit":5626,"platform":"ebay","title":"NEW OD Giraffe 7","cost":23429,"cat":"nostock"},{"date":"2026/05/21","month":"2026/05","profit":12131,"platform":"ebay","title":"PING tour 2.0 chrome driver shaft","cost":0,"cat":"nostock"},{"date":"2026/05/22","month":"2026/05","profit":3294,"platform":"ebay","title":"NEW Mutsumi Honma 13W","cost":12100,"cat":"nostock"},{"date":"2026/05/22","month":"2026/05","profit":-1205,"platform":"ebay","title":"NEW G430 MAX 10k Driver Head","cost":46769,"cat":"nostock"},{"date":"2026/05/23","month":"2026/05","profit":13784,"platform":"ebay","title":"PING Tour 2.0 Black","cost":0,"cat":"nostock"},{"date":"2026/05/23","month":"2026/05","profit":5170,"platform":"Yahoo!フリマ","title":"Diamana stiff driver shaft","cost":0,"cat":"nostock"},{"date":"2026/05/23","month":"2026/05","profit":4445,"platform":"ebay","title":"NEW Qi35 MAX Driver","cost":32941,"cat":"nostock"},{"date":"2026/05/23","month":"2026/05","profit":2309,"platform":"ebay","title":"NEW Qi10 MAX Driver Head","cost":29864,"cat":"nostock"},{"date":"2026/05/25","month":"2026/05","profit":9490,"platform":"ebay","title":"NEW Women Qi35 MAX LITE driver","cost":35726,"cat":"nostock"},{"date":"2026/05/25","month":"2026/05","profit":6675,"platform":"Yahoo!フリマ","title":"diamana regular","cost":0,"cat":"nostock"},{"date":"2026/05/26","month":"2026/05","profit":5784,"platform":"ebay","title":"NEW Cobra DS ADAPT MAX-D Driver","cost":29513,"cat":"nostock"},{"date":"2026/05/27","month":"2026/05","profit":8502,"platform":"ebay","title":"NEW Diamana BB 3 Shaft","cost":79869,"cat":"nostock"},{"date":"2026/05/27","month":"2026/05","profit":7055,"platform":"Yahoo!フリマ","title":"speeder cobra","cost":0,"cat":"nostock"},{"date":"2026/05/27","month":"2026/05","profit":5060,"platform":"Yahoo!フリマ","title":"Diamana stiff driver shaft","cost":0,"cat":"nostock"},{"date":"2026/05/30","month":"2026/05","profit":5181,"platform":"ebay","title":"NEW Qi35 MAX Driver Head","cost":30289,"cat":"nostock"},{"date":"2026/05/30","month":"2026/05","profit":3783,"platform":"ebay","title":"NEW Qi35 MAX Driver Head","cost":30289,"cat":"nostock"},{"date":"2026/05/31","month":"2026/05","profit":9685,"platform":"ebay","title":"NEW Qi10 MAX Driver Head","cost":31269,"cat":"nostock"},{"date":"2026/05/31","month":"2026/05","profit":5374,"platform":"ebay","title":"NEW OD Giraffe beam 1","cost":20918,"cat":"nostock"},{"date":"2026/05/31","month":"2026/05","profit":6228,"platform":"ebay","title":"Used G425 MAX Driver","cost":23980,"cat":"nostock"},{"date":"2026/05/31","month":"2026/05","profit":6891,"platform":"ebay","title":"NEW OD AI-one 2-BALL BLADE CH","cost":13811,"cat":"nostock"},{"date":"2026/06/01","month":"2026/06","profit":12858,"platform":"ebay","title":"PING Tour 2.0 Black","cost":0,"cat":"nostock"},{"date":"2026/06/01","month":"2026/06","profit":10013,"platform":"ebay","title":"NEW OD Giraffe 7","cost":16127,"cat":"nostock"},{"date":"2026/06/03","month":"2026/06","profit":2394,"platform":"ebay","title":"NEW G430 MAX 10k Driver Head","cost":43170,"cat":"nostock"},{"date":"2026/06/03","month":"2026/06","profit":6294,"platform":"ebay","title":"Used Tour AD VF 6S Farway shaft TM","cost":10710,"cat":"nostock"},{"date":"2026/06/03","month":"2026/06","profit":5767,"platform":"ebay","title":"NEW Mizuno ST-X 220 7W","cost":16110,"cat":"nostock"},{"date":"2026/06/03","month":"2026/06","profit":6250,"platform":"Yahoo!フリマ","title":"Diamana Regular shaft","cost":0,"cat":"nostock"},{"date":"2026/06/04","month":"2026/06","profit":9231,"platform":"ebay","title":"NEW OD Giraffe 7","cost":17561,"cat":"nostock"},{"date":"2026/06/05","month":"2026/06","profit":7150,"platform":"ebay","title":"NEW Qi35 Driver","cost":30236,"cat":"nostock"},{"date":"2026/06/05","month":"2026/06","profit":9102,"platform":"ebay","title":"NEW OD Giraffe 7","cost":18648,"cat":"nostock"},{"date":"2026/06/05","month":"2026/06","profit":5369,"platform":"ebay","title":"NEW OD Giraffe beam 1","cost":20423,"cat":"nostock"},{"date":"2026/06/05","month":"2026/06","profit":997,"platform":"ebay","title":"NEW G430 MAX 10k Driver Head","cost":44567,"cat":"nostock"},{"date":"2026/06/06","month":"2026/06","profit":6901,"platform":"ebay","title":"Used Diamana GT 41 inch TM","cost":6840,"cat":"nostock"},{"date":"2026/06/06","month":"2026/06","profit":2990,"platform":"ebay","title":"NEW OD Giraffe 2","cost":19234,"cat":"nostock"},{"date":"2026/06/06","month":"2026/06","profit":6312,"platform":"ebay","title":"Used Paradym 1W","cost":18980,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":11631,"platform":"ebay","title":"PING TOUR 2.0 CHROME","cost":0,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":14436,"platform":"Yahoo!フリマ","title":"PING Tour 2.0 Black","cost":0,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":9462,"platform":"ebay","title":"NEW OD Giraffe JAILBIRD 38","cost":17635,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":6882,"platform":"ebay","title":"NEW OD Giraffe 2","cost":17605,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":1496,"platform":"ebay","title":"NEW Qi10 Driver Head","cost":31495,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":4755,"platform":"ebay","title":"NEW OD Giraffe 2","cost":18622,"cat":"nostock"},{"date":"2026/06/07","month":"2026/06","profit":8374,"platform":"ebay","title":"Qi10 MAX Driver","cost":31317,"cat":"nostock"},{"date":"2026/06/08","month":"2026/06","profit":5304,"platform":"ebay","title":"NEW OD Giraffe 2","cost":18726,"cat":"nostock"},{"date":"2026/06/08","month":"2026/06","profit":3284,"platform":"ebay","title":"NEW Qi10 Driver Head","cost":31317,"cat":"nostock"},{"date":"2026/06/08","month":"2026/06","profit":7253,"platform":"ebay","title":"Stiff shaft","cost":0,"cat":"nostock"},{"date":"2026/06/09","month":"2026/06","profit":14861,"platform":"ebay","title":"NEW Women Qi irons","cost":61330,"cat":"nostock"},{"date":"2026/06/09","month":"2026/06","profit":5018,"platform":"ebay","title":"Used Diamana GT 41 inch TM","cost":6200,"cat":"nostock"},{"date":"2026/06/09","month":"2026/06","profit":4752,"platform":"Yahoo!フリマ","title":"Used PING G30 1W","cost":8728,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":5782,"platform":"ebay","title":"NEW OD Giraffe 2","cost":19358,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":5617,"platform":"ebay","title":"Used G425 MAX Driver","cost":21980,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":5462,"platform":"ebay","title":"Used TM Stealth 2 Driver head","cost":14000,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":7098,"platform":"ebay","title":"NEW OD Giraffe JAILBIRD 38","cost":19499,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":7228,"platform":"ebay","title":"Used Paradym Ai smoke mini","cost":34226,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":5060,"platform":"Yahoo!フリマ","title":"Diamana Stiff Shaft","cost":0,"cat":"nostock"},{"date":"2026/06/10","month":"2026/06","profit":5060,"platform":"Yahoo!フリマ","title":"Diamana Stiff shaft","cost":0,"cat":"nostock"},{"date":"2026/06/11","month":"2026/06","profit":6014,"platform":"ebay","title":"Qi10 MAX Driver","cost":33177,"cat":"nostock"},{"date":"2026/06/11","month":"2026/06","profit":9226,"platform":"ebay","title":"Used TM Stage 2 7W","cost":8736,"cat":"nostock"},{"date":"2026/06/12","month":"2026/06","profit":13429,"platform":"ebay","title":"NEW Women Qi irons","cost":62262,"cat":"nostock"},{"date":"2026/06/13","month":"2026/06","profit":6485,"platform":"ebay","title":"NEW OD Ai-one square 2 MAX","cost":23048,"cat":"nostock"},{"date":"2026/06/13","month":"2026/06","profit":4243,"platform":"ebay","title":"Qi10 MAX Driver","cost":35753,"cat":"nostock"},{"date":"2026/06/13","month":"2026/06","profit":9149,"platform":"ebay","title":"NEW OD Giraffe 7","cost":18601,"cat":"nostock"},{"date":"2026/06/14","month":"2026/06","profit":5363,"platform":"ebay","title":"Used TM BRNR MINI 1W","cost":33980,"cat":"nostock"},{"date":"2026/06/14","month":"2026/06","profit":4622,"platform":"ebay","title":"NEW Qi10 Driver","cost":34721,"cat":"nostock"},{"date":"2026/06/15","month":"2026/06","profit":7726,"platform":"ebay","title":"NEW OD Giraffe JAILBIRD 38","cost":18871,"cat":"nostock"},{"date":"2026/06/15","month":"2026/06","profit":4706,"platform":"ebay","title":"Used PING G425 SFT 1W","cost":26807,"cat":"nostock"},{"date":"2026/06/15","month":"2026/06","profit":7838,"platform":"ebay","title":"Used PING G400 MAX 1W","cost":23980,"cat":"nostock"},{"date":"2026/06/16","month":"2026/06","profit":6985,"platform":"ebay","title":"NEW Qi10 Driver","cost":33969,"cat":"nostock"}];
+const ALL=[...STOCK,...NOSTOCK];
+const PALETTE=['#1D9E75','#534AB7','#D85A30','#BA7517','#185FA5','#D4537E','#639922','#888780','#E24B4A','#0F6E56','#7F77DD','#F0997B'];
+let ds='all', charts=[];
+
+function getData(){
+  if(ds==='stock') return STOCK;
+  if(ds==='nostock') return NOSTOCK;
+  return ALL;
+}
+
+function fmt(n){ return '¥'+Math.round(n).toLocaleString(); }
+function pillCls(p){ return p>=10000?'pg':p>=5000?'pa':'pr'; }
+
+function setDS(v){
+  ds=v;
+  document.querySelectorAll('.seg').forEach((b,i)=>b.classList.toggle('on',['all','stock','nostock'][i]===v));
+  refresh();
+}
+
+function refresh(){
+  const d=getData();
+  const tot=d.reduce((s,r)=>s+r.profit,0);
+  const cur=d.filter(r=>r.month==='2026/06');
+  const curP=cur.reduce((s,r)=>s+r.profit,0);
+  const avg=d.length?tot/d.length:0;
+  document.getElementById('m1').textContent=fmt(tot);
+  document.getElementById('m1s').textContent=d.length+'件 合計';
+  document.getElementById('m2').textContent=fmt(curP);
+  document.getElementById('m2s').textContent='6月 '+cur.length+'件';
+  document.getElementById('m3').textContent=fmt(avg);
+  document.getElementById('m3s').textContent='全期間平均';
+  // 単月利益平均：月ごとの合計利益を出して、その平均をとる
+  const months=[...new Set(d.map(r=>r.month).filter(Boolean))];
+  const monthlyTotals=months.map(m=>d.filter(r=>r.month===m).reduce((s,r)=>s+r.profit,0));
+  const monthlyAvg=monthlyTotals.length?monthlyTotals.reduce((s,v)=>s+v,0)/monthlyTotals.length:0;
+  const bestMonth=months[monthlyTotals.indexOf(Math.max(...monthlyTotals))];
+  document.getElementById('m4').textContent=fmt(monthlyAvg);
+  document.getElementById('m4s').textContent=months.length+'ヶ月の平均　最高月: '+( bestMonth||'—');
+  document.getElementById('hd-sub').textContent=(ds==='all'?'全データ':ds==='stock'?'有在庫':'無在庫')+' · '+d.length+'件';
+  buildCharts(d);
+  renderItems(d);
+  renderList();
+}
+
+function buildCharts(d){
+  charts.forEach(c=>c.destroy()); charts=[];
+  const months=[...new Set(d.map(r=>r.month))].filter(Boolean).sort();
+  const mD=months.map(m=>{
+    const r=d.filter(x=>x.month===m);
+    const p=r.reduce((s,x)=>s+x.profit,0);
+    return {m,p,n:r.length,avg:r.length?p/r.length:0};
+  });
+  const lbl=mD.map(x=>x.m.replace('2026/','').replace('2025/','\'25/'));
+
+  charts.push(new Chart(document.getElementById('c-monthly'),{
+    type:'bar',
+    data:{labels:lbl,datasets:[
+      {data:mD.map(x=>Math.round(x.p)),backgroundColor:mD.map(x=>x.p>=0?'#1D9E75':'#E24B4A'),borderRadius:5,yAxisID:'y'},
+      {data:mD.map(x=>x.n),type:'line',borderColor:'#534AB7',borderDash:[4,3],backgroundColor:'transparent',pointBackgroundColor:'#534AB7',tension:.3,borderWidth:2,pointRadius:3,yAxisID:'y2'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.datasetIndex===0?'利益: '+fmt(ctx.raw):'件数: '+ctx.raw+'件'}}},
+    scales:{x:{ticks:{font:{size:11},color:'#9B9893',autoSkip:false,maxRotation:0},grid:{display:false}},
+    y:{ticks:{font:{size:10},color:'#9B9893',callback:v=>'¥'+Math.round(v/1000)+'k'},grid:{color:'rgba(0,0,0,.05)'},position:'left'},
+    y2:{ticks:{font:{size:10},color:'#534AB7'},grid:{display:false},position:'right'}}}
+  }));
+
+  charts.push(new Chart(document.getElementById('c-avg'),{
+    type:'line',
+    data:{labels:lbl,datasets:[{data:mD.map(x=>Math.round(x.avg)),borderColor:'#D85A30',backgroundColor:'rgba(216,90,48,.1)',pointBackgroundColor:'#D85A30',tension:.3,fill:true,borderWidth:2,pointRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'平均: '+fmt(ctx.raw)}}},
+    scales:{x:{ticks:{font:{size:11},color:'#9B9893',autoSkip:false,maxRotation:0},grid:{display:false}},y:{ticks:{font:{size:10},color:'#9B9893',callback:v=>'¥'+Math.round(v/1000)+'k'},grid:{color:'rgba(0,0,0,.05)'}}}}
+  }));
+
+  const pMap={};
+  d.forEach(r=>{const k=r.country||r.platform||'—'; if(!pMap[k])pMap[k]=0; pMap[k]+=r.profit;});
+  const sorted=Object.entries(pMap).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+  charts.push(new Chart(document.getElementById('c-donut'),{
+    type:'doughnut',
+    data:{labels:sorted.map(x=>x[0]),datasets:[{data:sorted.map(x=>Math.round(x[1])),backgroundColor:sorted.map((_,i)=>PALETTE[i%PALETTE.length]),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmt(ctx.raw)}}},cutout:'65%'}
+  }));
+  const leg=document.getElementById('donut-legend');
+  leg.innerHTML='';
+  sorted.slice(0,8).forEach(([k,v],i)=>{
+    leg.innerHTML+=`<div class="item"><span class="dot" style="background:${PALETTE[i%PALETTE.length]}"></span><span class="name">${k}</span><span class="val">${fmt(v)}</span></div>`;
+  });
+}
+
+function renderItems(d){
+  const sorted=[...d].sort((a,b)=>b.profit-a.profit);
+  document.getElementById('tb-items').innerHTML=sorted.slice(0,30).map((r,i)=>{
+    const badge=r.cat==='stock'?'<span class="badge badge-s">有</span>':'<span class="badge badge-n">無</span>';
+    return `<tr><td style="color:#9B9893;font-size:11px;text-align:center;">${i+1}</td><td class="title">${r.title}</td><td style="text-align:right"><span class="pill ${pillCls(r.profit)}">${fmt(r.profit)}</span></td><td style="text-align:right">${badge}</td></tr>`;
+  }).join('');
+}
+
+function renderList(){
+  const fm=document.getElementById('f-month').value;
+  const fc=document.getElementById('f-cat').value;
+  let d=fc==='stock'?STOCK:fc==='nostock'?NOSTOCK:ALL;
+  if(fm) d=d.filter(r=>r.month===fm);
+  d=[...d].filter(r=>r.date).sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('tb-list').innerHTML=d.map(r=>{
+    const badge=r.cat==='stock'?'<span class="badge badge-s">有</span>':'<span class="badge badge-n">無</span>';
+    return `<tr><td style="font-size:11px;color:#9B9893;white-space:nowrap;">${r.date.replace('2026/','')}</td><td>${badge}</td><td class="title">${r.title}</td><td style="text-align:right"><span class="pill ${pillCls(r.profit)}">${fmt(r.profit)}</span></td></tr>`;
+  }).join('');
+}
+
+function sw(name){
+  ['monthly','channel','items','list'].forEach(n=>{
+    document.getElementById('v-'+n).classList.toggle('on',n===name);
+    document.getElementById('nav-'+n).classList.toggle('on',n===name);
+    document.querySelectorAll('.tab')[['monthly','channel','items','list'].indexOf(n)].classList.toggle('on',n===name);
+  });
+}
+
+// Init month filter
+const allMonths=[...new Set(ALL.map(r=>r.month).filter(Boolean))].sort();
+const fm=document.getElementById('f-month');
+allMonths.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; fm.appendChild(o); });
+
+refresh();
+</script>
+</body>
+</html>
